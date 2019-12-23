@@ -1,4 +1,10 @@
 var axios = require('axios');
+var suggestionHelper = require('./suggestionHelper');
+
+var fillCountry = suggestionHelper.fillCountry;
+var fillState = suggestionHelper.fillState;
+var fillByKey = suggestionHelper.fillByKey;
+var fillPostCodeStreetNumber = suggestionHelper.fillPostCodeStreetNumber;
 
 function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 
@@ -86,6 +92,9 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 					.map(function (key) {
 						return address[key];
 					}).filter(function (value) { return value; });
+			if (['USA', 'CAN'].includes(address.Country) && address.State) {
+				labelArray.push(address.State);
+			}
 			var geocodeCountryIndex = address.AdditionalData.findIndex(function(el) {
 				return el.key === 'CountryName';
 			});
@@ -175,7 +184,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									if (ukResult) {
 										if (placesResult) {
 											placesResult.splice(0, 0, ukResult);
-											onSuccess(ukResult);
+											onSuccess(placesResult);
 										}
 									} else {
 										geocodeUrl += '&postalcode=' + encodeURIComponent(queryString);
@@ -221,7 +230,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 					}
 				}, errorCallback);
 
-				placesUrl += '&at=0,0&size=5';
+		placesUrl += '&at=0,0&size=5';
 		axios(placesUrl, { headers: { 'Accept-Language': 'en-US' } })
 			.then(function(response) {
 				return response.data;
@@ -250,9 +259,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 					axios.post(multiReverseUrl, data, { headers: { 'Content-Type': 'text/plain' } })
 							.then(function(response) {
 								return response.data;
-							}, function (reason) {
-							    console.error(reason);
-							})
+							}, errorCallback)
 							.then(function (json) {
 								var items = json.Response.Item;
 								var result = [];
@@ -287,105 +294,45 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									var geocodeAddress = bestResult.Location.Address;
 									var resAddress = {};
 									resAddress.AdditionalData = [];
-//								    if (match.bestMatch.rating > 0.7) {
 
-										addressComponentsKeys.forEach(function(key) {
-											var value = geocodeAddress[key];
+									fillByKey(addressComponentsKeys, geocodeAddress, placeAddressComponents, resAddress);
 
-											var index = placeAddressComponents.findIndex(function(el) {
+									fillCountry(geocodeAddress, placeAddressComponents, resAddress);
 
-												return value && el.toLowerCase() === value.toLowerCase();
-											});
-										    if (index > -1) {
-										        var placeComponent = placeAddressComponents[index];
-										        var clearedPlaceComponent = placeComponent.replace(value, '');
-										        if (clearedPlaceComponent.trim()) {
-										            placeAddressComponents[index] = clearedPlaceComponent;
-												} else {
-//													placeAddressComponents.splice(index, 1);
-													resAddress[key] = placeComponent;
-												}
-											}
-										});
+									fillPostCodeStreetNumber(bestResult, placeAddressComponents, resAddress, place);
 
-										var geocodeCountryIndex = geocodeAddress.AdditionalData.findIndex(function(el) {
-										    return el.key === 'CountryName';
-										});
-										var country = geocodeAddress.AdditionalData[geocodeCountryIndex].value;
-										var placeCountryIndex = placeAddressComponents.findIndex(function(addressComponent) {
-										    return addressComponent === country;
-										});
-										if (placeCountryIndex > -1) {
-										    placeAddressComponents.splice(placeCountryIndex, 1);
-										    resAddress.Country = geocodeAddress.Country;
-										    resAddress.AdditionalData.push(geocodeAddress.AdditionalData[geocodeCountryIndex]);
+									var partsToCreateAddressLabel;
+										// = ['USA', 'CAN'].includes(geocodeAddress.Country)
+										// ? ['HouseNumber', 'Street', 'District', 'City', 'State', 'PostalCode']
+										// : ['HouseNumber', 'Street', 'District', 'City', 'PostalCode'];
 
-											var country2Index = geocodeAddress.AdditionalData.findIndex(function(el) {
-												return el.key === 'Country2';
-											});
-
-											resAddress.AdditionalData.push(geocodeAddress.AdditionalData[country2Index]);
+									switch (place.category) {
+										case 'administrative-region':
+											partsToCreateAddressLabel = ['District', 'County'];
+											break;
+										case 'city-town-village':
+											partsToCreateAddressLabel = ['City'];
+											break;
+										default: {
+											partsToCreateAddressLabel = ['HouseNumber', 'Street', 'City', 'PostalCode'];
 										}
-
-										var streetIndex = geocodeAddress.Street && placeAddressComponents.findIndex(function(component) {
-											return component.includes(geocodeAddress.Street);
-										});
-										if (streetIndex > -1) {
-										    resAddress.Street = geocodeAddress.Street;
-											if (place.category === 'building' || place.resultType === 'place') {
-												var street = placeAddressComponents[streetIndex];
-												var placeHouseNumber = street.match(/^(\d+) /);
-												if (placeHouseNumber && placeHouseNumber !== geocodeAddress.HouseNumber) {
-													resAddress.HouseNumber = placeHouseNumber[1];
-													bestResult.Location.DisplayPosition = {
-														Latitude: place.position[0],
-														Longitude: place.position[1]
-													};
-													placeAddressComponents.splice(streetIndex, 1);
-												}
-											} else {
-												geocodeAddress.HouseNumber = null;
-											}
-
-											if (geocodeAddress.PostalCode) {
-												var placePostcodeIndex = placeAddressComponents.reverse().findIndex(function(component) {
-													return component.startsWith(geocodeAddress.PostalCode.split(' ')[0])
-//														|| geocodeAddress.PostalCode.startsWith(component);
-												});
-
-												if (placePostcodeIndex > -1) {
-													var placePostalCode = placeAddressComponents[placePostcodeIndex];
-													if (placePostalCode.length >= geocodeAddress.PostalCode.length) {
-														resAddress.PostalCode = placePostalCode;
-														bestResult.Location.DisplayPosition = {
-															Latitude: place.position[0],
-															Longitude: place.position[1]
-														};
-													} else {
-														resAddress.PostalCode = geocodeAddress.PostalCode;
-													}
-													placeAddressComponents.splice(placePostcodeIndex, 1);
-												}
-											}
-										} else if (place.category === 'postal-area') {
-											resAddress.PostalCode = geocodeAddress.PostalCode;
-										}
-//									}
-
-									if (['city-town-village', 'administrative-region'].includes(place.category)) {
-										delete resAddress.HouseNumber;
-										delete resAddress.Street;
-										delete resAddress.PostalCode;
-										delete resAddress.District;
 									}
 
-									var partsToCreateAddressLabel = ['USA', 'CAN'].includes(geocodeAddress.Country)
-											? ['HouseNumber', 'Street', 'District', 'City', 'State', 'PostalCode']
-											: ['HouseNumber', 'Street', 'District', 'City', 'PostalCode'];
-									if (place.category === 'administrative-region') {
-									    delete resAddress.City;
-									    partsToCreateAddressLabel = ['USA', 'CAN'].includes(geocodeAddress.Country) ? ['County', 'State'] : ['County'];
-									}
+									// if (['city-town-village', 'administrative-region'].includes(place.category)) {
+									// 	delete resAddress.HouseNumber;
+									// 	delete resAddress.Street;
+									// 	delete resAddress.PostalCode;
+									// }
+									//
+									// if (['city-town-village'].includes(place.category)) {
+									// 	delete resAddress.District;
+									// }
+
+
+									// if (place.category === 'administrative-region') {
+									//     delete resAddress.City;
+									//     partsToCreateAddressLabel = ['USA', 'CAN'].includes(geocodeAddress.Country) ? ['District', 'County', 'State'] : ['District', 'County'];
+									// }
 
 									if (!resAddress.Country) {
 										var countryIndex = geocodeAddress.AdditionalData.findIndex(function(el) {
@@ -402,16 +349,8 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									}
 
 									if (placeAddressComponents.includes(geocodeAddress.State)) {
-									    var stateIndex = geocodeAddress.AdditionalData.findIndex(function(el) {
-											return el.key === 'StateName';
-										});
-
-									    if (stateIndex > -1) {
-											resAddress.AdditionalData.push(geocodeAddress.AdditionalData[stateIndex]);
-										}
-										resAddress.State = geocodeAddress.State;
+										fillState(geocodeAddress, placeAddressComponents, resAddress);
 									}
-
 									var addressLabel = createAddressLabel(partsToCreateAddressLabel, resAddress);
 									resAddress.Label = (place.resultType === 'place' ? place.title + ', ' : '') + addressLabel;
 									bestResult.Location.Address = resAddress;
@@ -420,8 +359,8 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 								placesResult = result;
 								if (ukPlacesResult) {
 								    if (ukPlacesResult.length !== 0) {
-										result.splice(0, 0, ukPlacesResult[0]);
-									}
+											result.splice(0, 0, ukPlacesResult[0]);
+										}
 								    onSuccess(result);
 								}
 							}, errorCallback);
@@ -432,4 +371,4 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 }
 
 module.exports = getSuggestions;
-getSuggestions("LE9", "GB", (result) => console.log(result.map(r => r.Location.Address.Label)), (error) => console.log(error));
+getSuggestions("ha1 1bd", "GB", (result) => console.log(result.map(r => r.Location.Address.Label)), (error) => console.log(error));
