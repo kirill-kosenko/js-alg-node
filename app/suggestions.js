@@ -87,7 +87,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 				onFailure();
 			};
 
-			var createAddressLabel = function(keys, address) {
+		var createAddressLabel = function(keys, address) {
 			var labelArray = keys
 					.map(function (key) {
 						return address[key];
@@ -170,8 +170,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 											geocodeAddress.PostalCode = queryString.length < geocodeAddress.PostalCode.length
 													? geocodeAddress.PostalCode.split(' ')[0]
 													: geocodeAddress.PostalCode;
-											geocodeAddress.Label = createAddressLabel(
-													['USA', 'CAN'].includes(geocodeAddress.Country) ? ['City', 'State', 'PostalCode'] : ['City', 'PostalCode'],
+											geocodeAddress.Label = createAddressLabel(['City', 'PostalCode'],
 													geocodeAddress
 											);
 											delete geocodeAddress.HouseNumber;
@@ -371,4 +370,4 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 }
 
 module.exports = getSuggestions;
-getSuggestions("ha1 1bd", "GB", (result) => console.log(result.map(r => r.Location.Address.Label)), (error) => console.log(error));
+getSuggestions("Popeweg, 5928 SC Venlo, Netherlands", null, (result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
