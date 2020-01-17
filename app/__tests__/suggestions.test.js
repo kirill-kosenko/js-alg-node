@@ -24,7 +24,7 @@ test.each([
   ["WD17", "GB", "Watford, WD17, United Kingdom"],
   ["M17 1PG", "GB", "Mosley Road, Manchester, M17 1PG, United Kingdom"],
   ["M17 1WA", "GB", "Textilose Road, Manchester, M17 1WA, United Kingdom"],
-  ["Stretford", "GB", "Stretford, United Kingdom"],
+  ["Stretford", "GB", "Stretford, Manchester, United Kingdom"],
   ["OL8", "GB", "Oldham, OL8, United Kingdom"],
 
   ["United Kingdom", null, "United Kingdom"],
@@ -53,7 +53,7 @@ test.each([
   ["Springfield", "US", "Springfield, MO, United States"],
   ["Toronto", "CA", "Toronto, ON, Canada"],
 
-  ["Kalochori", "GR", "Kalochori, Greece"]
+  ["Kalochori", "GR", "Kalochori, Echedoro, Greece"]
 
 ])('%s, %s -> %s', async (query, allowedCountries, expected) => {
   var onSuccess = (resolve) => (result) => resolve(result);
@@ -61,8 +61,8 @@ test.each([
 
   var promise = new Promise((resolve, reject) => {
     getSuggestions(query, allowedCountries, onSuccess(resolve), onError(reject));
-  })
+  });
 
   var suggestions = await promise;
   expect(suggestions[0].Location.Address.Label).toBe(expected);
-})
+});

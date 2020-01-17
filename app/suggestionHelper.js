@@ -45,7 +45,7 @@ function fillByKey(keys, geocodeAddress, placeAddressComponents, resAddress) {
             //     placeAddressComponents[index] = clearedPlaceComponent;
             // } else {
 //													placeAddressComponents.splice(index, 1);
-                resAddress[key] = placeComponent;
+                resAddress[key] = value;
             // }
         }
     });

@@ -283,9 +283,9 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									});
 									var match = findBestMatch(placeAddress, resultsLabels);
 
-								    var bestResult = results[match.bestMatchIndex];
+									console.log('match', match);
 
-								    var addressComponentsKeys = ['County', 'City', 'District'];
+								    var bestResult = results[match.bestMatchIndex];
 
 									var placeAddressComponents = placeAddress.split(',').map(function (p) {
 										return p.trim();
@@ -294,20 +294,13 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									var resAddress = {};
 									resAddress.AdditionalData = [];
 
-									fillByKey(addressComponentsKeys, geocodeAddress, placeAddressComponents, resAddress);
-
-									fillCountry(geocodeAddress, placeAddressComponents, resAddress);
-
-									fillPostCodeStreetNumber(bestResult, placeAddressComponents, resAddress, place);
 
 									var partsToCreateAddressLabel;
-										// = ['USA', 'CAN'].includes(geocodeAddress.Country)
-										// ? ['HouseNumber', 'Street', 'District', 'City', 'State', 'PostalCode']
-										// : ['HouseNumber', 'Street', 'District', 'City', 'PostalCode'];
-
 									switch (place.category) {
 										case 'administrative-region':
-											partsToCreateAddressLabel = ['District', 'County'];
+											partsToCreateAddressLabel = place.title === geocodeAddress.District
+												? ['District', 'City', 'County']
+												: ['County'];
 											break;
 										case 'city-town-village':
 											partsToCreateAddressLabel = ['City'];
@@ -316,6 +309,16 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 											partsToCreateAddressLabel = ['HouseNumber', 'Street', 'City', 'PostalCode'];
 										}
 									}
+
+									fillByKey(partsToCreateAddressLabel, geocodeAddress, placeAddressComponents, resAddress);
+
+									fillCountry(geocodeAddress, placeAddressComponents, resAddress);
+
+									fillPostCodeStreetNumber(bestResult, placeAddressComponents, resAddress, place);
+
+										// = ['USA', 'CAN'].includes(geocodeAddress.Country)
+										// ? ['HouseNumber', 'Street', 'District', 'City', 'State', 'PostalCode']
+										// : ['HouseNumber', 'Street', 'District', 'City', 'PostalCode'];
 
 									// if (['city-town-village', 'administrative-region'].includes(place.category)) {
 									// 	delete resAddress.HouseNumber;
@@ -370,4 +373,4 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 }
 
 module.exports = getSuggestions;
-getSuggestions("Popeweg, 5928 SC Venlo, Netherlands", null, (result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
+getSuggestions("2013 SAINT ST RICHLAND WA 99354", "USA", (result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
