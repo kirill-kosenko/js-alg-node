@@ -117,117 +117,163 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 			onResult(results);
 		}
 
-		var ukPlacesResult, placesResult;
+		function extractPartialPostcodeResult(items) {
+			for (var i = 0; i < items.length; i++) {
+				var results = items[i].Result;
 
-		var ukPlacesUrl = placesUrl + '&X-Map-Viewport=-17.3088,47.5205,14.2219,59.0657';
-		axios(ukPlacesUrl, { headers: { 'Accept-Language': 'en-US' } })
-				.then(function(response) {
-					return response.data;
-				}, errorCallback)
-				.then(function(json) {
-					var places = json.results.filter(function(r) {
-						return r.position;
-					});
+				var partialResult = results.find(function (r) {
+					var postalCode = r.Location.Address.PostalCode;
+					return postalCode && postalCode.toLowerCase().startsWith(queryString.toLowerCase());
+				});
 
-					if (places && places.length > 0) {
-						var data = '';
-						var place, position;
-						for (var i = 0; i < places.length; i++) {
-							place = places[i];
-							position = place.position;
+				if (partialResult) {
+					return createPartialResult(partialResult);
+				}
+			}
+			return null;
+		}
 
-							var vicinity = place.vicinity ? place.vicinity.replace(/<br\/>/g, ',') : '';
-							place.placeAddress = place.resultType === 'place'
-									? vicinity
-									: place.title + ', ' + vicinity;
+		function createPartialResult(sourceResult) {
+			var targetAddress = {};
+			var sourceAddress = sourceResult.Location.Address;
 
-							data += 'id=' + i + '&prox=' + position[0] + ',' + position[1] + ',1000\n';
-						}
+			targetAddress.PostalCode = queryString.length < sourceAddress.PostalCode.length
+				? sourceAddress.PostalCode.split(' ')[0]
+				: sourceAddress.PostalCode;
 
-						axios.post(multiReverseUrl, data, { headers: { 'Content-Type': 'text/plain' } })
-								.then(function(response) {
-									return response.data;
-								}, function (reason) {
-									console.error(reason);
-								})
-								.then(function (json) {
-									var items = json.Response.Item;
-									var ukResult;
-									var place, placeAddress;
-									for (var i = 0; i < items.length; i++) {
-										place = places[i];
-										placeAddress = place.placeAddress;
+			targetAddress.City = sourceAddress.City;
+			targetAddress.StateName = find('StateName', sourceAddress);
+			targetAddress.State = sourceAddress.State;
+			targetAddress.Country = sourceAddress.Country;
+			targetAddress.CountryName = find('CountryName', sourceAddress);
+			targetAddress.AdditionalData = sourceAddress.AdditionalData;
 
-										var results = items[i].Result;
+			targetAddress.Label = createAddressLabel(
+				['City', 'PostalCode'],
+				targetAddress
+			);
+			return { Location: { Address: targetAddress }, DisplayPosition: sourceResult.DisplayPosition };
+		}
 
-										ukResult = results.find(function (r) {
-										    var postalCode = r.Location.Address.PostalCode;
-											return postalCode && postalCode.toLowerCase().startsWith(queryString.toLowerCase());
-										});
+		function find(key, address) {
+			var index = address.AdditionalData.findIndex(function(el) {
+				return el.key === key;
+			});
+			var data = address.AdditionalData[index];
+			return data && data.value;
+		}
 
-										if (ukResult) {
-											var geocodeAddress = ukResult.Location.Address;
-											geocodeAddress.PostalCode = queryString.length < geocodeAddress.PostalCode.length
-													? geocodeAddress.PostalCode.split(' ')[0]
-													: geocodeAddress.PostalCode;
-											geocodeAddress.Label = createAddressLabel(['City', 'PostalCode'],
-													geocodeAddress
-											);
-											delete geocodeAddress.HouseNumber;
-											delete geocodeAddress.Street;
-											ukPlacesResult = [ukResult];
-											break;
-										}
-									}
+		var /*ukPlacesResult, */placesResult;
 
-									if (ukResult) {
-										if (placesResult) {
-											placesResult.splice(0, 0, ukResult);
-											onSuccess(placesResult);
-										}
-									} else {
-										geocodeUrl += '&postalcode=' + encodeURIComponent(queryString);
-										axios(geocodeUrl)
-												.then(function (response) {
-													return response.data;
-												}, errorCallback)
-												.then(function(json) {
-													var geocodeResult = json.Response.View[0] && json.Response.View[0].Result.find(function(r) {
-														var address = r.Location.Address;
-														var postCodeLowCase = address.PostalCode.toLowerCase();
-														var queryStringLowCase = queryString.toLowerCase();
-														return address.Country === 'GBR' &&
-																(postCodeLowCase.startsWith(queryStringLowCase) || postCodeLowCase.startsWith(queryStringLowCase.split(' ')[0]));
-													});
-
-													if (geocodeResult) {
-														var address = geocodeResult.Location.Address;
-														address.PostalCode = address.PostalCode.toLowerCase() === queryString.toLowerCase()
-																? address.PostalCode
-																: address.PostalCode.split(' ')[0];
-														address.Label = createAddressLabel(
-																['USA', 'CAN'].includes(address.Country) ? ['City', 'State', 'PostalCode'] : ['City', 'PostalCode'],
-																address
-														);
-
-														ukPlacesResult = [geocodeResult];
-													} else {
-														ukPlacesResult = [];
-													}
-
-													if (placesResult) {
-														if (geocodeResult) {
-															placesResult.splice(0, 0, geocodeResult);
-														}
-														onSuccess(placesResult);
-													}
-												}, errorCallback);
-									}
-								}, errorCallback);
-					} else {
-						errorCallback();
-					}
-				}, errorCallback);
+		// var ukPlacesUrl = placesUrl + '&X-Map-Viewport=-17.3088,47.5205,14.2219,59.0657';
+		// axios(ukPlacesUrl, { headers: { 'Accept-Language': 'en-US' } })
+		// 		.then(function(response) {
+		// 			return response.data;
+		// 		}, errorCallback)
+		// 		.then(function(json) {
+		// 			var places = json.results.filter(function(r) {
+		// 				return r.position;
+		// 			});
+		//
+		// 			if (places && places.length > 0) {
+		// 				var data = '';
+		// 				var place, position;
+		// 				for (var i = 0; i < places.length; i++) {
+		// 					place = places[i];
+		// 					position = place.position;
+		//
+		// 					var vicinity = place.vicinity ? place.vicinity.replace(/<br\/>/g, ',') : '';
+		// 					place.placeAddress = place.resultType === 'place'
+		// 							? vicinity
+		// 							: place.title + ', ' + vicinity;
+		//
+		// 					data += 'id=' + i + '&prox=' + position[0] + ',' + position[1] + ',1000\n';
+		// 				}
+		//
+		// 				axios.post(multiReverseUrl, data, { headers: { 'Content-Type': 'text/plain' } })
+		// 						.then(function(response) {
+		// 							return response.data;
+		// 						}, function (reason) {
+		// 							console.error(reason);
+		// 						})
+		// 						.then(function (json) {
+		// 							var items = json.Response.Item;
+		// 							var ukResult;
+		// 							var place, placeAddress;
+		// 							for (var i = 0; i < items.length; i++) {
+		// 								place = places[i];
+		// 								placeAddress = place.placeAddress;
+		//
+		// 								var results = items[i].Result;
+		//
+		// 								ukResult = results.find(function (r) {
+		// 								    var postalCode = r.Location.Address.PostalCode;
+		// 									return postalCode && postalCode.toLowerCase().startsWith(queryString.toLowerCase());
+		// 								});
+		//
+		// 								if (ukResult) {
+		// 									var geocodeAddress = ukResult.Location.Address;
+		// 									geocodeAddress.PostalCode = queryString.length < geocodeAddress.PostalCode.length
+		// 											? geocodeAddress.PostalCode.split(' ')[0]
+		// 											: geocodeAddress.PostalCode;
+		// 									geocodeAddress.Label = createAddressLabel(['City', 'PostalCode'],
+		// 											geocodeAddress
+		// 									);
+		// 									delete geocodeAddress.HouseNumber;
+		// 									delete geocodeAddress.Street;
+		// 									ukPlacesResult = [ukResult];
+		// 									break;
+		// 								}
+		// 							}
+		//
+		// 							if (ukResult) {
+		// 								if (placesResult) {
+		// 									placesResult.splice(0, 0, ukResult);
+		// 									onSuccess(placesResult);
+		// 								}
+		// 							} else {
+		// 								geocodeUrl += '&postalcode=' + encodeURIComponent(queryString);
+		// 								axios(geocodeUrl)
+		// 										.then(function (response) {
+		// 											return response.data;
+		// 										}, errorCallback)
+		// 										.then(function(json) {
+		// 											var geocodeResult = json.Response.View[0] && json.Response.View[0].Result.find(function(r) {
+		// 												var address = r.Location.Address;
+		// 												var postCodeLowCase = address.PostalCode.toLowerCase();
+		// 												var queryStringLowCase = queryString.toLowerCase();
+		// 												return address.Country === 'GBR' &&
+		// 														(postCodeLowCase.startsWith(queryStringLowCase) || postCodeLowCase.startsWith(queryStringLowCase.split(' ')[0]));
+		// 											});
+		//
+		// 											if (geocodeResult) {
+		// 												var address = geocodeResult.Location.Address;
+		// 												address.PostalCode = address.PostalCode.toLowerCase() === queryString.toLowerCase()
+		// 														? address.PostalCode
+		// 														: address.PostalCode.split(' ')[0];
+		// 												address.Label = createAddressLabel(
+		// 														['USA', 'CAN'].includes(address.Country) ? ['City', 'State', 'PostalCode'] : ['City', 'PostalCode'],
+		// 														address
+		// 												);
+		//
+		// 												ukPlacesResult = [geocodeResult];
+		// 											} else {
+		// 												ukPlacesResult = [];
+		// 											}
+		//
+		// 											if (placesResult) {
+		// 												if (geocodeResult) {
+		// 													placesResult.splice(0, 0, geocodeResult);
+		// 												}
+		// 												onSuccess(placesResult);
+		// 											}
+		// 										}, errorCallback);
+		// 							}
+		// 						}, errorCallback);
+		// 			} else {
+		// 				errorCallback();
+		// 			}
+		// 		}, errorCallback);
 
 		placesUrl += '&at=0,0&size=5';
 		axios(placesUrl, { headers: { 'Accept-Language': 'en-US' } })
@@ -241,7 +287,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 
 			    if (places && places.length > 0) {
 			        var data = '';
-			        var place, position, params, postalAddress;
+			        var place, position, params;
 			        for (var i = 0; i < places.length; i++) {
 			            place = places[i];
 			            position = place.position;
@@ -263,6 +309,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 								var items = json.Response.Item;
 								var result = [];
 								var place, placeAddress;
+								var partialPostcodeResult = extractPartialPostcodeResult(items);
 								for (var i = 0; i < items.length; i++) {
 								    place = places[i];
 									placeAddress = place.placeAddress;
@@ -283,7 +330,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									});
 									var match = findBestMatch(placeAddress, resultsLabels);
 
-									console.log('match', match);
+									// console.log('match', match);
 
 								    var bestResult = results[match.bestMatchIndex];
 
@@ -316,26 +363,6 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 
 									fillPostCodeStreetNumber(bestResult, placeAddressComponents, resAddress, place);
 
-										// = ['USA', 'CAN'].includes(geocodeAddress.Country)
-										// ? ['HouseNumber', 'Street', 'District', 'City', 'State', 'PostalCode']
-										// : ['HouseNumber', 'Street', 'District', 'City', 'PostalCode'];
-
-									// if (['city-town-village', 'administrative-region'].includes(place.category)) {
-									// 	delete resAddress.HouseNumber;
-									// 	delete resAddress.Street;
-									// 	delete resAddress.PostalCode;
-									// }
-									//
-									// if (['city-town-village'].includes(place.category)) {
-									// 	delete resAddress.District;
-									// }
-
-
-									// if (place.category === 'administrative-region') {
-									//     delete resAddress.City;
-									//     partsToCreateAddressLabel = ['USA', 'CAN'].includes(geocodeAddress.Country) ? ['District', 'County', 'State'] : ['District', 'County'];
-									// }
-
 									if (!resAddress.Country) {
 										var countryIndex = geocodeAddress.AdditionalData.findIndex(function(el) {
 											return el.key === 'CountryName';
@@ -358,13 +385,44 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 									bestResult.Location.Address = resAddress;
 									result.push(bestResult);
 								}
-								placesResult = result;
-								if (ukPlacesResult) {
-								    if (ukPlacesResult.length !== 0) {
-											result.splice(0, 0, ukPlacesResult[0]);
-										}
-								    onSuccess(result);
+
+								if (partialPostcodeResult) {
+									result.splice(0, 0, partialPostcodeResult);
 								}
+
+								if (result && result.length) {
+									onSuccess(result);
+								} else {
+									geocodeUrl += '&postalcode=' + encodeURIComponent(queryString);
+									axios(geocodeUrl)
+											.then(function (response) {
+												return response.data;
+											}, errorCallback)
+											.then(function(json) {
+												var geocodeResult = json.Response.View[0] && json.Response.View[0].Result.find(function(r) {
+													var address = r.Location.Address;
+													var postCodeLowCase = address.PostalCode.toLowerCase();
+													var queryStringLowCase = queryString.toLowerCase();
+													return address.Country === 'GBR' &&
+															(postCodeLowCase.startsWith(queryStringLowCase) || postCodeLowCase.startsWith(queryStringLowCase.split(' ')[0]));
+												});
+
+												if (geocodeResult) {
+													var address = geocodeResult.Location.Address;
+													address.PostalCode = address.PostalCode.toLowerCase() === queryString.toLowerCase()
+															? address.PostalCode
+															: address.PostalCode.split(' ')[0];
+													address.Label = createAddressLabel(
+															['USA', 'CAN'].includes(address.Country) ? ['City', 'State', 'PostalCode'] : ['City', 'PostalCode'],
+															address
+													);
+
+													onSuccess([geocodeResult]);
+												} else {
+													onSuccess([])
+												}
+											}, errorCallback);
+									}
 							}, errorCallback);
 				} else {
 					errorCallback();
@@ -373,4 +431,4 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 }
 
 module.exports = getSuggestions;
-getSuggestions("2013 SAINT ST RICHLAND WA 99354", "USA", (result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
+// getSuggestions("H3A 1J7", "CAN", (result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
