@@ -39,14 +39,7 @@ function fillByKey(keys, geocodeAddress, placeAddressComponents, resAddress) {
             return value && el.toLowerCase().includes(value.toLowerCase());
         });
         if (index > -1) {
-            var placeComponent = placeAddressComponents[index];
-            // var clearedPlaceComponent = placeComponent.replace(value, '');
-            // if (clearedPlaceComponent.trim()) {
-            //     placeAddressComponents[index] = clearedPlaceComponent;
-            // } else {
-//													placeAddressComponents.splice(index, 1);
-                resAddress[key] = value;
-            // }
+            resAddress[key] = value;
         }
     });
 }
@@ -81,7 +74,7 @@ function fillPostCodeStreetNumber(bestResult, placeAddressComponents, resAddress
 
             if (placePostcodeIndex > -1) {
                 var placePostalCode = placeAddressComponents[placePostcodeIndex];
-                if (placePostalCode.length >= geocodeAddress.PostalCode.length && geocodeAddress.Country === 'GBR') {
+                if (placePostalCode.length <= 12 && placePostalCode.length >= geocodeAddress.PostalCode.length && geocodeAddress.Country === 'GBR') {
                     resAddress.PostalCode = placePostalCode;
                     bestResult.Location.DisplayPosition = {
                         Latitude: place.position[0],
