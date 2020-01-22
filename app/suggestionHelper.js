@@ -24,10 +24,15 @@ function fillState(geocodeAddress, placeAddressComponents, resAddress) {
         return el.key === 'StateName';
     });
 
+    var state;
     if (stateIndex > -1) {
-        resAddress.AdditionalData.push(geocodeAddress.AdditionalData[stateIndex]);
+        state = geocodeAddress.AdditionalData[stateIndex];
     }
-    resAddress.State = geocodeAddress.State;
+
+    if (placeAddressComponents.includes(geocodeAddress.State) || (state && placeAddressComponents.includes(state.value))) {
+        resAddress.AdditionalData.push(state);
+        resAddress.State = geocodeAddress.State;
+    }
 }
 
 function fillByKey(keys, geocodeAddress, placeAddressComponents, resAddress) {

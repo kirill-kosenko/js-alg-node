@@ -6,7 +6,7 @@ var fillState = suggestionHelper.fillState;
 var fillByKey = suggestionHelper.fillByKey;
 var fillPostCodeStreetNumber = suggestionHelper.fillPostCodeStreetNumber;
 
-function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
+function getSuggestions(queryString, allowedCountries, americanUser, onResult, onFailure) {
 
 	  var placesUrl = 'https://places.api.here.com/places/v1/autosuggest?app_code=3UpwZJS-ymLTM2zEAEMSfQ&app_id=aerSeN2zm0flQOz3KqZS&q='
             + encodeURIComponent(queryString);
@@ -16,6 +16,11 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
         placesUrl += '&addressFilter=' + encodeURIComponent('countryCode=' + allowedCountries);
         geocodeUrl += '&country=' + encodeURIComponent(allowedCountries);
     }
+
+	var mapView = americanUser
+		? '-167.7076,15.9276,-50.4385,71.3572' // mapView coordinates includes North America
+		: '-26.5945,27.844,46.7039,71.6023';   // mapView coordinates includes UK and Euro
+	placesUrl += '&X-Map-Viewport=' + mapView;
 
 		var multiReverseUrl = 'https://reverse.geocoder.api.here.com/6.2/multi-reversegeocode.json?app_id=aerSeN2zm0flQOz3KqZS&app_code=3UpwZJS-ymLTM2zEAEMSfQ' +
 				'&locationattributes=in%2Ctz&gen=9&additionaldata=Country2%2Ctrue&mode=retrieveAddresses&maxresults=20&language=en';
@@ -163,7 +168,7 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 			return data && data.value;
 		}
 
-		placesUrl += '&at=0,0&size=5';
+		placesUrl += '&size=5';
 		axios(placesUrl, { headers: { 'Accept-Language': 'en-US' } })
 			.then(function(response) {
 				return response.data;
@@ -251,6 +256,8 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 
 									fillPostCodeStreetNumber(bestResult, placeAddressComponents, resAddress, place);
 
+									fillState(geocodeAddress, placeAddressComponents, resAddress);
+
 									if (!resAddress.Country) {
 										var countryIndex = geocodeAddress.AdditionalData.findIndex(function(el) {
 											return el.key === 'CountryName';
@@ -265,9 +272,6 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 										resAddress.AdditionalData.push(geocodeAddress.AdditionalData[code2Idx]);
 									}
 
-									if (placeAddressComponents.includes(geocodeAddress.State)) {
-										fillState(geocodeAddress, placeAddressComponents, resAddress);
-									}
 									var addressLabel = createAddressLabel(partsToCreateAddressLabel, resAddress);
 									resAddress.Label = (place.resultType === 'place' ? place.title + ', ' : '') + addressLabel;
 									bestResult.Location.Address = resAddress;
@@ -319,4 +323,4 @@ function getSuggestions(queryString, allowedCountries, onResult, onFailure) {
 }
 
 module.exports = getSuggestions;
-getSuggestions("Am Wasserturm, 98724 Neuhaus am Rennweg, Germany", "DEU", (result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
+// getSuggestions("25403", null, true,(result) => console.log(result.map(r => r.Location.Address)), (error) => console.log(error));
